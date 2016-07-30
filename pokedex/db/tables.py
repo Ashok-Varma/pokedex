@@ -130,50 +130,50 @@ class Ability(TableBase):
     is_main_series = Column(Boolean, nullable=False, index=True,
         doc=u"True iff the ability exists in the main series.")
 
-create_translation_table('ability_names', Ability, 'names',
-    relation_lazy='joined',
-    name = Column(Unicode(79), nullable=False, index=True,
-        doc=u"The name",
-        info=dict(format='plaintext', official=True, ripped=True)),
-)
-create_translation_table('ability_prose', Ability, 'prose',
-    short_effect = Column(UnicodeText, nullable=True,
-        doc=u"A short summary of this ability's effect",
-        info=dict(format='markdown', string_getter=markdown.MarkdownString)),
-    effect = Column(UnicodeText, nullable=True,
-        doc=u"A detailed description of this ability's effect",
-        info=dict(format='markdown', string_getter=markdown.MarkdownString)),
-)
+# create_translation_table('ability_names', Ability, 'names',
+#     relation_lazy='joined',
+#     name = Column(Unicode(79), nullable=False, index=True,
+#         doc=u"The name",
+#         info=dict(format='plaintext', official=True, ripped=True)),
+# )
+# create_translation_table('ability_prose', Ability, 'prose',
+#     short_effect = Column(UnicodeText, nullable=True,
+#         doc=u"A short summary of this ability's effect",
+#         info=dict(format='markdown', string_getter=markdown.MarkdownString)),
+#     effect = Column(UnicodeText, nullable=True,
+#         doc=u"A detailed description of this ability's effect",
+#         info=dict(format='markdown', string_getter=markdown.MarkdownString)),
+# )
 
-class AbilityChangelog(TableBase):
-    """History of changes to abilities across main game versions."""
-    __tablename__ = 'ability_changelog'
-    __singlename__ = 'ability_changelog'
-    id = Column(Integer, primary_key=True, nullable=False,
-        doc=u"This change's unique ID")
-    ability_id = Column(Integer, ForeignKey('abilities.id'), nullable=False,
-        doc=u"The ID of the ability that changed")
-    changed_in_version_group_id = Column(Integer, ForeignKey('version_groups.id'), nullable=False,
-        doc=u"The ID of the version group in which the ability changed")
+# class AbilityChangelog(TableBase):
+#     """History of changes to abilities across main game versions."""
+#     __tablename__ = 'ability_changelog'
+#     __singlename__ = 'ability_changelog'
+#     id = Column(Integer, primary_key=True, nullable=False,
+#         doc=u"This change's unique ID")
+#     ability_id = Column(Integer, ForeignKey('abilities.id'), nullable=False,
+#         doc=u"The ID of the ability that changed")
+#     changed_in_version_group_id = Column(Integer, ForeignKey('version_groups.id'), nullable=False,
+#         doc=u"The ID of the version group in which the ability changed")
 
-create_translation_table('ability_changelog_prose', AbilityChangelog, 'prose',
-    effect = Column(UnicodeText, nullable=False,
-        doc=u"A description of the old behavior",
-        info=dict(format='markdown', string_getter=markdown.MarkdownString))
-)
+# create_translation_table('ability_changelog_prose', AbilityChangelog, 'prose',
+#     effect = Column(UnicodeText, nullable=False,
+#         doc=u"A description of the old behavior",
+#         info=dict(format='markdown', string_getter=markdown.MarkdownString))
+# )
 
-class AbilityFlavorText(TableBase):
-    u"""In-game flavor text of an ability."""
-    __tablename__ = 'ability_flavor_text'
-    ability_id = Column(Integer, ForeignKey('abilities.id'), primary_key=True, nullable=False, autoincrement=False,
-        doc=u"The ID of the ability")
-    version_group_id = Column(Integer, ForeignKey('version_groups.id'), primary_key=True, nullable=False, autoincrement=False,
-        doc=u"The ID of the version group this flavor text is taken from")
-    language_id = Column(Integer, ForeignKey('languages.id'), primary_key=True, nullable=False,
-        doc=u"The language")
-    flavor_text = Column(UnicodeText, nullable=False,
-        doc=u"The actual flavor text",
-        info=dict(official=True, format='gametext'))
+# class AbilityFlavorText(TableBase):
+#     u"""In-game flavor text of an ability."""
+#     __tablename__ = 'ability_flavor_text'
+#     ability_id = Column(Integer, ForeignKey('abilities.id'), primary_key=True, nullable=False, autoincrement=False,
+#         doc=u"The ID of the ability")
+#     version_group_id = Column(Integer, ForeignKey('version_groups.id'), primary_key=True, nullable=False, autoincrement=False,
+#         doc=u"The ID of the version group this flavor text is taken from")
+#     language_id = Column(Integer, ForeignKey('languages.id'), primary_key=True, nullable=False,
+#         doc=u"The language")
+#     flavor_text = Column(UnicodeText, nullable=False,
+#         doc=u"The actual flavor text",
+#         info=dict(official=True, format='gametext'))
 
 class Berry(TableBase):
     u"""A Berry, consumable item that grows on trees.
@@ -2242,24 +2242,24 @@ class VersionGroupRegion(TableBase):
 
 ### Relationships down here, to avoid dependency ordering problems
 
-Ability.changelog = relationship(AbilityChangelog,
-    order_by=AbilityChangelog.changed_in_version_group_id.desc(),
-    backref=backref('ability', innerjoin=True, lazy='joined'))
-Ability.flavor_text = relationship(AbilityFlavorText,
-    order_by=AbilityFlavorText.version_group_id,
-    backref=backref('ability', innerjoin=True, lazy='joined'))
+# Ability.changelog = relationship(AbilityChangelog,
+#     order_by=AbilityChangelog.changed_in_version_group_id.desc(),
+#     backref=backref('ability', innerjoin=True, lazy='joined'))
+# Ability.flavor_text = relationship(AbilityFlavorText,
+#     order_by=AbilityFlavorText.version_group_id,
+#     backref=backref('ability', innerjoin=True, lazy='joined'))
 Ability.generation = relationship(Generation,
     innerjoin=True,
     backref='abilities')
 
-AbilityChangelog.changed_in = relationship(VersionGroup,
-    innerjoin=True, lazy='joined',
-    backref='ability_changelog')
-
-AbilityFlavorText.version_group = relationship(VersionGroup,
-    innerjoin=True)
-AbilityFlavorText.language = relationship(Language,
-    innerjoin=True, lazy='joined')
+# AbilityChangelog.changed_in = relationship(VersionGroup,
+#     innerjoin=True, lazy='joined',
+#     backref='ability_changelog')
+#
+# AbilityFlavorText.version_group = relationship(VersionGroup,
+#     innerjoin=True)
+# AbilityFlavorText.language = relationship(Language,
+#     innerjoin=True, lazy='joined')
 
 
 Berry.berry_firmness = relationship(BerryFirmness,

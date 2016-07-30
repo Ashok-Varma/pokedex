@@ -334,25 +334,25 @@ def load(session, tables=[], directory=None, drop_tables=False, verbose=False, s
         print_done()
 
 
-    print_start('Translations')
-    transl = translations.Translations(csv_directory=directory)
-
-    new_row_count = 0
-    for translation_class, rows in transl.get_load_data(langs):
-        table_obj = translation_class.__table__
-        if table_obj in table_objs:
-            insert_stmt = table_obj.insert()
-            session.execute(insert_stmt, rows)
-            session.commit()
-            # We don't have a total, but at least show some increasing number
-            new_row_count += len(rows)
-            print_status(str(new_row_count))
-
-    # SQLite check
-    if engine.dialect.name == 'sqlite':
-        session.execute("PRAGMA integrity_check")
-
-    print_done()
+    # print_start('Translations')
+    # transl = translations.Translations(csv_directory=directory)
+    #
+    # new_row_count = 0
+    # for translation_class, rows in transl.get_load_data(langs):
+    #     table_obj = translation_class.__table__
+    #     if table_obj in table_objs:
+    #         insert_stmt = table_obj.insert()
+    #         session.execute(insert_stmt, rows)
+    #         session.commit()
+    #         # We don't have a total, but at least show some increasing number
+    #         new_row_count += len(rows)
+    #         print_status(str(new_row_count))
+    #
+    # # SQLite check
+    # if engine.dialect.name == 'sqlite':
+    #     session.execute("PRAGMA integrity_check")
+    #
+    # print_done()
 
 
 def dump(session, tables=[], directory=None, verbose=False, langs=None):
