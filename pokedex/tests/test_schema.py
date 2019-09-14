@@ -3,11 +3,10 @@
 import pytest
 
 from sqlalchemy import Column, Integer, String, create_engine
-from sqlalchemy.orm import class_mapper, joinedload, sessionmaker
-from sqlalchemy.orm.session import Session
+from sqlalchemy.orm import joinedload, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 
-from pokedex.db import tables, markdown
+from pokedex.db import tables
 from pokedex.db.multilang import MultilangScopedSession, MultilangSession, \
     create_translation_table
 
@@ -198,9 +197,11 @@ def test_texts(cls):
             pytest.fail("%s: description mentions English" % column)
     # If there's more than one text column in a translation table,
     # they have to be nullable, to support missing translations
+    # Exception: the 'name' column may be required, if none of the other
+    # columns make sense without it
     if hasattr(cls, 'local_language') and len(text_columns) > 1:
         for column in text_columns:
-            assert column.nullable
+            assert column.nullable or column.name == 'name'
 
 @parametrize('table', tables.mapped_classes)
 def test_identifiers_with_names(table):

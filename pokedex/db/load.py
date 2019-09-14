@@ -3,7 +3,6 @@ from __future__ import print_function
 
 import csv
 import fnmatch
-import io
 import os.path
 import sys
 
@@ -12,7 +11,7 @@ import sqlalchemy.sql.util
 import sqlalchemy.types
 
 import pokedex
-from pokedex.db import metadata, tables, translations
+from pokedex.db import metadata, translations
 from pokedex.defaults import get_default_csv_dir
 from pokedex.db.dependencies import find_dependent_tables
 from pokedex.db.oracle import rewrite_long_table_names
@@ -157,8 +156,21 @@ def load(session, tables=[], directory=None, drop_tables=False, verbose=False, s
 
     # SQLite speed tweaks
     if not safe and engine.dialect.name == 'sqlite':
-        session.execute("PRAGMA synchronous=OFF")
-        session.execute("PRAGMA journal_mode=OFF")
+        # We have to explicity call close here because session.execute
+        # returns a ResultProxy object that hangs onto the database cursor
+        # in case you wanted to see the results of your statement, and
+        # these PRAGMA commands helpfully return the string 'OFF'.
+        #
+        # This would not normally be a problem, except that when
+        # journal_mode=OFF, SQLite sometimes doesn't like it when you
+        # have multiple database cursors open.
+        #
+        # This would still not normally be a problem because CPython
+        # will free the ResultProxy immediately because it isn't referenced,
+        # closing the database cursor, but this isn't true in PyPy,
+        # which doesn't use reference counting.
+        session.execute("PRAGMA synchronous=OFF").close()
+        session.execute("PRAGMA journal_mode=OFF").close()
 
     # Drop all tables if requested
     if drop_tables:
@@ -181,7 +193,7 @@ def load(session, tables=[], directory=None, drop_tables=False, verbose=False, s
 
     print_start('Creating tables')
     for n, table in enumerate(table_objs):
-        table.create()
+        table.create(bind=engine)
         print_status('%s/%s' % (n, len(table_objs)))
     print_done()
 
@@ -198,7 +210,10 @@ def load(session, tables=[], directory=None, drop_tables=False, verbose=False, s
 
         try:
             csvpath = "%s/%s.csv" % (directory, table_name)
-            csvfile = open(csvpath, 'r')
+            if six.PY2:
+                csvfile = open(csvpath, 'r')
+            else:
+                csvfile = open(csvpath, 'r', encoding="utf8")
         except IOError:
             # File doesn't exist; don't load anything!
             print_done('missing?')
@@ -323,7 +338,7 @@ def load(session, tables=[], directory=None, drop_tables=False, verbose=False, s
                 # Could happen if row A refers to B which refers to C.
                 # This is ridiculous and doesn't happen in my data so far
                 raise ValueError("Too many levels of self-reference!  "
-                                 "Row was: " + str(row))
+                                 "Row was: " + str(row_data))
 
             session.execute(
                 insert_stmt.values(**row_data)
@@ -404,7 +419,7 @@ def dump(session, tables=[], directory=None, verbose=False, langs=None):
 
         # CSV module only works with bytes on 2 and only works with text on 3!
         if six.PY3:
-            writer = csv.writer(open(filename, 'w', newline=''), lineterminator='\n')
+            writer = csv.writer(open(filename, 'w', newline='', encoding="utf8"), lineterminator='\n')
             columns = [col.name for col in table.columns]
         else:
             writer = csv.writer(open(filename, 'wb'), lineterminator='\n')

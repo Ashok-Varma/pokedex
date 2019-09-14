@@ -26,18 +26,15 @@ classes in that module can be used to change the default language.
 """
 # XXX: Check if "gametext" is set correctly everywhere
 
-import collections
 from functools import partial
+import six
 
-from sqlalchemy import Column, ForeignKey, MetaData, PrimaryKeyConstraint, Table, UniqueConstraint
+from sqlalchemy import Column, ForeignKey, MetaData, PrimaryKeyConstraint, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base, DeclarativeMeta
 from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import backref, relationship
-from sqlalchemy.orm.session import Session
-from sqlalchemy.orm.interfaces import AttributeExtension
-from sqlalchemy.sql import and_, or_
-from sqlalchemy.schema import ColumnDefault
+from sqlalchemy.sql import and_
 from sqlalchemy.types import Boolean, Enum, Integer, SmallInteger, Unicode, UnicodeText
 
 from pokedex.db import markdown, multilang
@@ -56,7 +53,7 @@ class TableSuperclass(object):
         if not pk_constraint:
             return u"<%s object at %x>" % (typename, id(self))
 
-        pk = u', '.join(unicode(getattr(self, column.name))
+        pk = u', '.join(six.text_type(getattr(self, column.name))
             for column in pk_constraint.columns)
         try:
             return u"<%s object (%s): %s>" % (typename, pk, self.identifier)
@@ -64,10 +61,13 @@ class TableSuperclass(object):
             return u"<%s object (%s)>" % (typename, pk)
 
     def __str__(self):
-        return unicode(self).encode('utf8')
+        if six.PY2:
+            return six.text_type(self).encode('utf8')
+        else:
+            return type(self).__unicode__(self)
 
     def __repr__(self):
-        return unicode(self).encode('utf8')
+        return str(self)
 
 mapped_classes = []
 class TableMetaclass(DeclarativeMeta):
@@ -90,10 +90,10 @@ class Language(TableBase):
     id = Column(Integer, primary_key=True, nullable=False,
         doc=u"A numeric ID")
     iso639 = Column(Unicode(79), nullable=False,
-        doc=u"The two-letter code of the country where this language is spoken. Note that it is not unique.",
+        doc=u"The two-letter code of the language. Note that it is not unique.",
         info=dict(format='identifier'))
     iso3166 = Column(Unicode(79), nullable=False,
-        doc=u"The two-letter code of the language. Note that it is not unique.",
+        doc=u"The two-letter code of the country where this language is spoken. Note that it is not unique.",
         info=dict(format='identifier'))
     identifier = Column(Unicode(79), nullable=False,
         doc=u"An identifier",
@@ -850,7 +850,17 @@ create_translation_table('encounter_method_prose', EncounterMethod, 'prose',
 )
 
 class EncounterSlot(TableBase):
-    u"""An abstract "slot" within a method, associated with both some set of conditions and a rarity."""
+    u"""An abstract "slot" within a method, associated with both some set of conditions and a rarity.
+
+    "slot" has a very specific meaning:
+    If during gameplay you know sufficient details about the current game state,
+    you can predict which slot (and therefore which pokemon) will spawn.
+
+    There are currently two reasons that "slot" might be empty:
+    1) The slot corresponds to a gift pokemon.
+    2) Red/Blue's Super Rod slots, which don't correspond to in-game slots.
+       See https://github.com/veekun/pokedex/issues/166#issuecomment-220101455
+    """
 
     __tablename__ = 'encounter_slots'
     id = Column(Integer, primary_key=True, nullable=False,
@@ -1058,6 +1068,9 @@ class ItemFlingEffect(TableBase):
     __singlename__ = 'item_fling_effect'
     id = Column(Integer, primary_key=True, nullable=False,
         doc=u"A numeric ID")
+    identifier = Column(Unicode(79), nullable=False,
+        doc=u"An identifier of this fling effect",
+        info=dict(format='identifier'))
 
 create_translation_table('item_fling_effect_prose', ItemFlingEffect, 'prose',
     effect = Column(UnicodeText, nullable=False,
@@ -1100,7 +1113,7 @@ class Location(TableBase):
         doc=u"A numeric ID")
     region_id = Column(Integer, ForeignKey('regions.id'),
         doc=u"ID of the region this location is in")
-    identifier = Column(Unicode(79), nullable=False,
+    identifier = Column(Unicode(79), nullable=False, unique=True,
         doc=u"An identifier",
         info=dict(format='identifier'))
 
@@ -1108,6 +1121,11 @@ create_translation_table('location_names', Location, 'names',
     relation_lazy='joined',
     name = Column(Unicode(79), nullable=False, index=True,
         doc=u"The name",
+        info=dict(format='plaintext', official=True)),
+    subtitle = Column(Unicode(79), nullable=True, index=False,
+        doc=u"""A subtitle for the location, if any.
+            This may be an alternate name for the locaton, as in the Kalos routes,
+            or the name of a subarea of the location, as in Alola.""",
         info=dict(format='plaintext', official=True)),
 )
 
@@ -1124,6 +1142,11 @@ class LocationArea(TableBase):
     identifier = Column(Unicode(79), nullable=True,
         doc=u"An identifier",
         info=dict(format='identifier'))
+
+    __table_args__ = (
+        UniqueConstraint(location_id, identifier),
+        {},
+    )
 
 create_translation_table('location_area_prose', LocationArea, 'prose',
     relation_lazy='joined',
@@ -1262,6 +1285,10 @@ class MoveChangelog(TableBase):
         doc=u"Prior base PP of the move, or NULL if unchanged")
     accuracy = Column(SmallInteger, nullable=True,
         doc=u"Prior accuracy of the move, or NULL if unchanged")
+    priority = Column(SmallInteger, nullable=True,
+        doc=u"Prior priority of the move, or NULL if unchanged")
+    target_id = Column(Integer, ForeignKey('move_targets.id'), nullable=True,
+        doc=u"Prior ID of the target, or NULL if unchanged")
     effect_id = Column(Integer, ForeignKey('move_effects.id'), nullable=True,
         doc=u"Prior ID of the effect, or NULL if unchanged")
     effect_chance = Column(Integer, nullable=True,
@@ -1744,6 +1771,13 @@ class PokemonDexNumber(TableBase):
     pokedex_number = Column(Integer, nullable=False,
         doc=u"Number of the Pokémon in that the Pokédex")
 
+    __table_args__ = (
+        UniqueConstraint(pokedex_id, pokedex_number),
+        UniqueConstraint(pokedex_id, species_id),
+        {},
+    )
+
+
 class PokemonEggGroup(TableBase):
     u"""Maps an Egg group to a species; each species belongs to one or two egg groups."""
     __tablename__ = 'pokemon_egg_groups'
@@ -1976,6 +2010,9 @@ create_translation_table('pokemon_shape_prose', PokemonShape, 'prose',
         info=dict(format='plaintext', official=False)),
     awesome_name = Column(Unicode(79), nullable=True,
         doc=u"A splendiferous name of the body shape",
+        info=dict(format='plaintext')),
+    description = Column(UnicodeText, nullable=True,
+        doc=u"A detailed description of the body shape",
         info=dict(format='plaintext')),
 )
 
@@ -2556,6 +2593,8 @@ MoveChangelog.changed_in = relationship(VersionGroup,
     innerjoin=True, lazy='joined',
     backref='move_changelog')
 MoveChangelog.move_effect = relationship(MoveEffect,
+    backref='move_changelog')
+MoveChangelog.target = relationship(MoveTarget,
     backref='move_changelog')
 MoveChangelog.type = relationship(Type,
     backref='move_changelog')
